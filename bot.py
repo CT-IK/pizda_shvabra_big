@@ -91,7 +91,7 @@ async def info_cmd(message: types.Message):
     user_devis = userinfo[9]
     user_role = userinfo[10]
     if user_role == '':
-        user_role = 'Шестерка'
+        user_role = 'Саппорт'
     
     
     text = (
