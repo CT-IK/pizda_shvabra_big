@@ -283,6 +283,7 @@ async def save_users(message: types.Message):
     Users[user.id] = user.username
 
 async def main():
+    print('Бот работает')
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
