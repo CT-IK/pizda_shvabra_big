@@ -20,6 +20,7 @@ with open('комплименты.csv', 'r', encoding='UTF-8') as comp:
         complements.append(''.join(i))
 
 DATA = []
+orgcom = ['@diaa_le', '@aamdenisov', '@DmitriyIkhsanov', '@DmitriyIkhsanov', '@nikiforovau', '@Polyakovaaa', '@ulbnv']
 with open('DATA.csv', 'r', encoding='UTF-8') as file:
     for i in csv.reader(file):
         if i[5].startswith('@'):
@@ -33,7 +34,7 @@ async def help_cmd(message: types.Message):
         "\n"
         "Полезные:\n"
         "/help — Список команд\n"
-        "/инфа - Информация о пользователе. Используйте с ответом на сообщение или укажите @username\n"
+        "/инфа [@username] - Информация о пользователе.\n"
         "/номер - Номер телефона пользователя\n"
         "/мут [секунды] - Мутит пользователя. Используйте с ответом на сообщение\n"
         "/анмут - Размут всех пользователей\n"
@@ -41,8 +42,8 @@ async def help_cmd(message: types.Message):
         "Приколюха:\n"
         "/вероятность - расчитывает вероятность события\n"
         "/цитата - Сохраняет цитату. Используйте с ответом на сообщение\n"
-        "/цитата - Выводит рандомную цитату\n"
-        "/цитата @username - Выводит рандомную цитату пользователя\n"
+        "/мысль - Выводит рандомную цитату\n"
+        "/мысль @username - Выводит рандомную цитату пользователя\n"
         "/кто - Узнать, кто больше всего соответствует запросу\n"
         "/совместимость – Показывает совместимость чего-либо.\n"
         "/комплимент - Делает комплемент пользователю. Используйте с ответом на сообщение или @username\n"
@@ -63,17 +64,12 @@ async def chance_cmd(message: types.Message):
 
 @dp.message(Command('инфа'))
 async def info_cmd(message: types.Message):
-    user = None
-    if message.reply_to_message:
-        user = message.reply_to_message.from_user.username
+    args = message.text.split()
+    if len(args) > 1 and args[1].startswith('@'):
+        user = args[1][1:]
     else:
-        args = message.text.split()
-        if len(args) > 1 and args[1].startswith('@'):
-            user = args[1][1:]
-    if not user:
         await message.reply(
             "❗ Используй:\n"
-            "/инфа ответом на сообщение\n"
             "/инфа @username"
         )
         return
@@ -88,11 +84,10 @@ async def info_cmd(message: types.Message):
     user_faculty = userinfo[2]
     user_VK = userinfo[4]
     user_number = userinfo[7]
-    user_devis = userinfo[9]
+    user_devis = None
     user_role = userinfo[10]
     if user_role == '':
         user_role = 'Саппорт'
-    
     
     text = (
         f"<b>👤 ИНФОРМАЦИЯ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
@@ -100,10 +95,15 @@ async def info_cmd(message: types.Message):
         f"<b>Роль:</b> {user_role}\n"
         f"<b>Факультет:</b> {user_faculty} {user_course} курс\n"
         f"<b>ВК:</b> <a href='{user_VK}'>Кликабельно</a>\n"
-        f"<b>Telegram:</b> @{user}"
+        f"<b>Telegram:</b> @{user}\n"
+        f"<b>Номер телефона:</b> {user_number}\n"
     )
+    text_devis = ''
+    if ('@' + user in orgcom):
+        user_devis = userinfo[9]
+        text_devis = (f'<b>Девиз:</b> {user_devis}')
 
-    await message.reply(text, parse_mode="HTML")
+    await message.reply(text + text_devis, parse_mode="HTML")
 
 @dp.message(Command('номер'))
 async def number_cmd(message: types.Message):
@@ -129,11 +129,48 @@ async def number_cmd(message: types.Message):
     user_number = userinfo[7]
     await message.reply(user_number)
 
+@dp.message(Command('мысль'))
+async def thought_cmd(message: types.Message):
+    thoughts = []
+    with open('цитаты.csv', 'r', encoding='UTF-8') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            thoughts.append(row)
+    args = message.text.split()
+    if len(args) > 2:
+        await message.reply('Вы неправильно использовали команду\nПопробуйте снова')
+    else:
+        if len(args) == 1:
+            random_thought = random.choice(thoughts)
+            thought, author = random_thought
+            await message.reply(
+                f'«{thought}»\n\n'
+                f'Автор: @{author}'
+            )
+        elif len(args) == 2 and args[1].startswith('@'):
+            user = args[1][1:]
+            if ('@' + user) in (message.text.split()):
+                userquotes = [x for x in thoughts if user in x]
+                random_thought = random.choice(userquotes)
+                thought, author = random_thought
+                await message.reply(
+                    f'«{thought}»\n\n'
+                    f'Автор: @{author}'
+                )
+            else:
+                await message.reply('❌ Пользователь не найден')
+        else:
+            await message.reply('Вы неправильно использовали команду\nПопробуйте снова')
+
+
+
 @dp.message(Command('цитата'))
 async def quote_cmd(message: types.Message):
-    if message.reply_to_message:
-        quote = message.reply_to_message.text
-        user = message.reply_to_message.from_user.username
+    quote = message.reply_to_message.text
+    user = message.reply_to_message.from_user.username
+    if quote == None:
+        await message.reply('Используйте ответом на сообщение')
+    else:
         with open('цитаты.csv', 'a', encoding='UTF-8', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([quote, user])
@@ -142,35 +179,6 @@ async def quote_cmd(message: types.Message):
             f"«{quote}»\n"
             f"— @{user}"
         )
-    else:
-        args = message.text.split()
-        if len(args) > 1 and args[1].startswith('@'):
-            user = args[1][1:]
-        quotes = []
-        with open('цитаты.csv', 'r', encoding='UTF-8') as file:
-            reader = csv.reader(file)
-            for row in reader:
-                quotes.append(row)
-        if len(message.text.split()) == 1:
-            random_quotes = random.choice(quotes)
-            quote, author = random_quotes
-            await message.reply(
-                f'«{quote}»\n\n'
-                f'Автор: @{author}'
-            )
-        
-        else:
-            if ('@' + user) in (message.text.split()):
-                userquotes = [x for x in quotes if user in x]
-                random_quotes = random.choice(userquotes)
-                quote, author = random_quotes
-                await message.reply(
-                    f'«{quote}»\n\n'
-                    f'Автор: @{author}'
-                )
-
-            else:
-                await message.reply('Вы неправильно использовали команду\nПопробуйте снова')
 
 @dp.message(Command('кто'))
 async def who_cmd(message: types.Message):
