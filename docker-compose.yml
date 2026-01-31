@@ -1,0 +1,9 @@
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram_bot
+    environment:
+      - TOKEN=${TOKEN}
+    volumes:
+      - .:/app
+    restart: unless-stopped
