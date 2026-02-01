@@ -13,6 +13,83 @@ load_dotenv(find_dotenv())
 bot = Bot(token=os.getenv("TOKEN"))
 dp = Dispatcher()
 
+ACTIONS = {
+    "обнять": [
+        "🤗 @{from_user} обнял @{to_user}",
+        "🫂 @{from_user} крепко обнял @{to_user}"
+    ],
+    "пожать_руку": [
+        "🤝 @{from_user} пожал руку @{to_user}",
+        "🤝 @{from_user} с уважением пожал руку @{to_user}"
+    ],
+    "погладить": [
+        "😊 @{from_user} погладил @{to_user}",
+        "😌 @{from_user} нежно погладил @{to_user}"
+    ],
+    "похвалить": [
+        "🌟 @{from_user} похвалил @{to_user}: ты красавчик!",
+        "👏 @{from_user} сказал, что @{to_user} отлично справился",
+        "🔥 @{from_user} считает, что @{to_user} реально крут",
+        "💎 @{from_user} отметил, что @{to_user} — топ",
+        "🏆 @{from_user} похвалил @{to_user} за отличную работу"
+    ],
+    "поддержать": [
+        "❤️ @{from_user} поддержал @{to_user}: всё получится",
+        "🤝 @{from_user} рядом с @{to_user} в трудную минуту",
+        "🫶 @{from_user} сказал @{to_user}, что он не один"
+    ],
+    "поблагодарить": [
+        "🙏 @{from_user} поблагодарил @{to_user}",
+        "💐 @{from_user} сказал спасибо @{to_user}",
+        "🙌 @{from_user} выразил благодарность @{to_user}"
+    ],
+    "поздравить": [
+        "🎉 @{from_user} поздравил @{to_user}",
+        "🥳 @{from_user} от всей души поздравляет @{to_user}",
+        "🎂 @{from_user} пожелал всего лучшего @{to_user}"
+    ],
+
+    "тыкнуть": [
+        "👉 @{from_user} тыкнул в @{to_user}",
+        "😐 @{from_user} зачем-то тыкнул @{to_user}"
+    ],
+    "посмотреть": [
+        "👀 @{from_user} внимательно посмотрел на @{to_user}",
+        "🧐 @{from_user} изучающе посмотрел на @{to_user}"
+    ],
+    "позавидовать": [
+        "😒 @{from_user} завидует @{to_user}",
+        "👀 @{from_user} с завистью посмотрел на @{to_user}"
+    ],
+
+    "ударить": [
+        "👊 @{from_user} ударил @{to_user}",
+        "💥 @{from_user} отвесил леща @{to_user}"
+    ],
+    "уебать": [
+        "💢 @{from_user} уебал @{to_user}",
+        "🔥 @{from_user} жёстко уебал @{to_user}"
+    ],
+    "оскорбить": [
+        "😈 @{from_user} оскорбил @{to_user}",
+        "💀 @{from_user} словесно уничтожил @{to_user}"
+    ],
+    "уважать": [
+        "🫡 @{from_user} выразил уважение @{to_user}",
+        "💪 @{from_user} уважает @{to_user}"
+    ],
+    "осуждать": [
+        "☝️ @{from_user} осуждает @{to_user}",
+        "🤨 @{from_user} неодобрительно посмотрел на @{to_user}"
+    ],
+    "аплодировать": [
+        "👏 @{from_user} аплодирует @{to_user}",
+        "👏👏 @{from_user} громко похлопал @{to_user}"
+    ]
+}
+
+
+
 Users = {}
 complements = []
 with open('комплименты.csv', 'r', encoding='UTF-8') as comp:
@@ -27,29 +104,55 @@ with open('DATA.csv', 'r', encoding='UTF-8') as file:
             DATA.append(i)
 usernames = [y for x in DATA for y in x if y.startswith('@')]
 
+def find_user(message: types.Message):
+    args = message.text.split()
+    if len(args) == 2 and args[1].startswith('@'):
+        return args[1][1:]
+    return None
+
 @dp.message(Command("help"))
 async def help_cmd(message: types.Message):
     await message.answer(
-        "📖 Доступные команды:\n"
-        "\n"
-        "Полезные:\n"
-        "/help — Список команд\n"
-        "/инфа [@username] - Информация о пользователе.\n"
-        "/номер - Номер телефона пользователя\n"
-        "/мут [секунды] - Мутит пользователя. Используйте с ответом на сообщение\n"
-        "/анмут - Размут всех пользователей\n"
-        "\n"
-        "Приколюха:\n"
-        "/вероятность - расчитывает вероятность события\n"
-        "/цитата - Сохраняет цитату. Используйте с ответом на сообщение\n"
-        "/мысль - Выводит рандомную цитату\n"
-        "/мысль @username - Выводит рандомную цитату пользователя\n"
-        "/кто - Узнать, кто больше всего соответствует запросу\n"
-        "/совместимость – Показывает совместимость чего-либо.\n"
-        "/комплимент - Делает комплемент пользователю. Используйте с ответом на сообщение или @username\n"
-        "/рулетка - Испытай удачу\n"
-        "/девиз - Выдает рандомный девиз с анкет с подписью автора"
-    )
+    "📖 Доступные команды:\n"
+    "\n"
+    "Полезные:\n"
+    "/help — Список команд\n"
+    "/инфа [@username] — Информация о пользователе\n"
+    "/номер — Номер телефона пользователя\n"
+    "/мут [секунды] — Мутит пользователя (ответом на сообщение)\n"
+    "/анмут — Размут пользоватея. Используйте ответом на сообщение\n"
+    "\n"
+    "Приколюха:\n"
+    "/вероятность — Рассчитывает вероятность события\n"
+    "/цитата — Сохраняет цитату (ответом на сообщение)\n"
+    "/мысль — Выводит рандомную цитату\n"
+    "/мысль [@username] — Цитата конкретного пользователя\n"
+    "/кто — Узнать, кто больше всего соответствует запросу\n"
+    "/совместимость — Показывает совместимость чего-либо\n"
+    "/комплимент — Сделать комплимент пользователю\n"
+    "/рулетка — Испытай удачу\n"
+    "/девиз — Рандомный девиз с подписью автора\n"
+    "/девиз [@username] — Девиз автора\n"
+    "\n"
+    "Интерактивные команды:\n"
+    "/обнять [@username]\n"
+    "/пожать_руку [@username]\n"
+    "/погладить [@username]\n"
+    "/похвалить [@username]\n"
+    "/поддержать [@username]\n"
+    "/поблагодарить [@username]\n"
+    "/поздравить [@username]\n"
+    "/тыкнуть [@username]\n"
+    "/посмотреть [@username]\n"
+    "/позавидовать [@username]\n"
+    "/ударить [@username]\n"
+    "/уебать [@username]\n"
+    "/оскорбить [@username]\n"
+    "/уважать [@username]\n"
+    "/осуждать [@username]\n"
+    "/аплодировать [@username]"
+)
+
 
 
 @dp.message(Command('вероятность'))
@@ -269,21 +372,57 @@ async def mute_cmd(message: types.Message):
         await message.reply('Нельзя тебе мутить\nМаленький еще!')
 @dp.message(Command('анмут'))
 async def unmute_cmd(message: types.Message):
-    for user_id in Users.keys():
+    if message.reply_to_message:
         await bot.restrict_chat_member(
             chat_id=message.chat.id,
-            user_id=user_id,
+            user_id=message.reply_to_message.from_user.id,
             permissions=types.ChatPermissions(can_send_messages=True)
         )
-    await message.reply('Все пользователи размучены')
+        await message.reply('Сделал')
+    else:
+        for user_id in Users.keys():
+            await bot.restrict_chat_member(
+                chat_id=message.chat.id,
+                user_id=user_id,
+                permissions=types.ChatPermissions(can_send_messages=True)
+            )
+        await message.reply('Все пользователи размучены')
 
 @dp.message(Command('девиз'))
 async def devis_cmd(message: types.Message):
-    a = random.choice(DATA)
-    await message.reply(
-        f'{a[9]}\n\n'
-        f'Автор: {a[5]}'
-    )
+    args = message.text.split()
+    if len(args) == 2 and args[1].startswith('@'):
+        user = find_user(message)
+        for i in DATA:
+            if ('@' + user) in i:
+                a = i
+        await message.reply(
+            f'{a[9]}\n\n'
+            f'Автор: {a[5]}'
+        )
+    else:    
+        a = random.choice(DATA)
+        await message.reply(
+            f'{a[9]}\n\n'
+            f'Автор: {a[5]}'
+        )
+
+#интерактивные команды
+@dp.message()
+async def action_cmd(message: types.Message):
+    if not message.text.startswith('/'):
+        return
+    command = message.text.split()
+    command = command[0][1:]
+    if command not in ACTIONS:
+        return
+    to_user = find_user(message)
+    from_user = message.from_user.username
+    if to_user == None:
+        await message.reply('Введите в формате\n/[действие] @username')
+    else:
+        text = random.choice(ACTIONS[command]).format(from_user=from_user, to_user=to_user)
+        await message.reply(text)
 
 @dp.message()
 async def save_users(message: types.Message):
