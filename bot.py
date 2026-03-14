@@ -10,6 +10,8 @@ from datetime import timedelta
 
 load_dotenv(find_dotenv())
 
+import db
+
 bot = Bot(token=os.getenv("TOKEN"))
 dp = Dispatcher()
 
@@ -96,13 +98,7 @@ with open('комплименты.csv', 'r', encoding='UTF-8') as comp:
     for i in csv.reader(comp):
         complements.append(''.join(i))
 
-DATA = []
 orgcom = ['@diaa_le', '@aamdenisov', '@DmitriyIkhsanov', '@DmitriyIkhsanov', '@nikiforovau', '@Polyakovaaa', '@ulbnv']
-with open('DATA.csv', 'r', encoding='UTF-8') as file:
-    for i in csv.reader(file):
-        if i[5].startswith('@'):
-            DATA.append(i)
-usernames = [y for x in DATA for y in x if y.startswith('@')]
 
 def find_user(message: types.Message):
     args = message.text.split()
@@ -118,7 +114,7 @@ async def help_cmd(message: types.Message):
     "Полезные:\n"
     "/help — Список команд\n"
     "/инфа [@username] — Информация о пользователе\n"
-    "/номер — Номер телефона пользователя\n"
+    #"/номер — Номер телефона пользователя\n"
     "/мут [секунды] — Мутит пользователя (ответом на сообщение)\n"
     "/анмут — Размут пользоватея. Используйте ответом на сообщение\n"
     "\n"
@@ -131,8 +127,6 @@ async def help_cmd(message: types.Message):
     "/совместимость — Показывает совместимость чего-либо\n"
     "/комплимент — Сделать комплимент пользователю\n"
     "/рулетка — Испытай удачу\n"
-    "/девиз — Рандомный девиз с подписью автора\n"
-    "/девиз [@username] — Девиз автора\n"
     "\n"
     "Интерактивные команды:\n"
     "/обнять [@username]\n"
@@ -164,51 +158,49 @@ async def chance_cmd(message: types.Message):
     else:
         await message.reply(f'Вероятность того, что {event} - {chance}%')
 
+@dp.message(Command('тест'))
+async def test_cmd(message: types.Message):
+    await message.answer(message.text)
 
 @dp.message(Command('инфа'))
 async def info_cmd(message: types.Message):
     args = message.text.split()
     if len(args) > 1 and args[1].startswith('@'):
-        user = args[1][1:]
+        username = args[1]
     else:
         await message.reply(
             "❗ Используй:\n"
             "/инфа @username"
         )
         return
-
-    for i in DATA:
-        if ('@' + user) in i:
-            userinfo = i
-    if userinfo == None:
-        await message.reply("❌ Пользователь не найден")
-    user_name = userinfo[0]
-    user_course = userinfo[1]
-    user_faculty = userinfo[2]
-    user_VK = userinfo[4]
-    user_number = userinfo[7]
-    user_devis = None
-    user_role = userinfo[10]
-    if user_role == '':
-        user_role = 'Саппорт'
     
-    text = (
+    userdata = db.userdata(username)[0]
+    if userdata == None:
+        text = 'Пользователь не найден'
+    else:
+        if db.userdata(username)[1] == 'Coach':
+            text = (
         f"<b>👤 ИНФОРМАЦИЯ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
-        f"<b>ФИО:</b> {user_name}\n"
-        f"<b>Роль:</b> {user_role}\n"
-        f"<b>Факультет:</b> {user_faculty} {user_course} курс\n"
-        f"<b>ВК:</b> <a href='{user_VK}'>Кликабельно</a>\n"
-        f"<b>Telegram:</b> @{user}\n"
-        f"<b>Номер телефона:</b> {user_number}\n"
+        f"<b>ФИО:</b> {userdata[0]}\n"
+        f"<b>Роль:</b> {userdata[5]}\n"
+        f"<b>Курс:</b> {userdata[1]}\n"
+        f"<b>Telegram:</b> {username}\n"
+        f"<b>Номер телефона:</b> {userdata[4]}\n"
     )
-    text_devis = ''
-    if ('@' + user in orgcom):
-        user_devis = userinfo[9]
-        text_devis = (f'<b>Девиз:</b> {user_devis}')
+        else:
+            text = (
+        f"<b>👤 ИНФОРМАЦИЯ ПОЛЬЗОВАТЕЛЯ</b>\n\n"
+        f"<b>ФИО:</b> {userdata[0]}\n"
+        f"<b>Роль:</b> {userdata[10]}\n"
+        f"<b>Факультет:</b> {userdata[2]} {userdata[1]} курс\n"
+        f"<b>ВК:</b> <a href='{userdata[4]}'>Кликабельно</a>\n"
+        f"<b>Telegram:</b> {username}\n"
+        f"<b>Номер телефона:</b> {userdata[7]}\n"
+    )
 
-    await message.reply(text + text_devis, parse_mode="HTML")
+    await message.reply(text, parse_mode="HTML")
 
-@dp.message(Command('номер'))
+'''@dp.message(Command('номер'))
 async def number_cmd(message: types.Message):
     user = None
     if message.reply_to_message:
@@ -230,7 +222,7 @@ async def number_cmd(message: types.Message):
     if userinfo == None:
         await message.reply("❌ Пользователь не найден")
     user_number = userinfo[7]
-    await message.reply(user_number)
+    await message.reply(user_number)'''
 
 @dp.message(Command('мысль'))
 async def thought_cmd(message: types.Message):
@@ -286,7 +278,7 @@ async def quote_cmd(message: types.Message):
 @dp.message(Command('кто'))
 async def who_cmd(message: types.Message):
     question = message.text.split()
-    who = random.choice(usernames)
+    who = random.choice(db.usernames())[0]
     if len(question) < 2:
         await message.reply('Вы неправильно использовали команду\nПопробуйте снова')
     else:
@@ -337,9 +329,9 @@ async def roulette_cmd(message: types.Message):
             permissions=types.ChatPermissions(can_send_messages=False),
             until_date=until_date
         )
-        await message.reply('БАМ! Тебе сегодня явно не везет\nТы поймал мут на 5 минут')
+        await message.reply('Тебе сегодня явно не везет\nТы поймал мут на 5 минут')
     else:
-        await message.reply('Везунчик, живешь без мута\nПопробуй еще раз)')
+        await message.reply('Везунчик, живешь без мута\nПопробуй еще раз')
 
 @dp.message(Command('мут'))
 async def mute_cmd(message: types.Message):
@@ -367,7 +359,7 @@ async def mute_cmd(message: types.Message):
                 f'Пользователь @{user} замучен на {seconds} секунд'
             )
         else:
-            await message.reply('Введите в формате\n/мут [секунды]\n И используйте ответом на сообщение пользователя')   
+            await message.reply('Введите в формате\n/мут [секунды]\nи используйте ответом на сообщение пользователя')   
     else:
         await message.reply('Нельзя тебе мутить\nМаленький еще!')
 @dp.message(Command('анмут'))
@@ -388,7 +380,7 @@ async def unmute_cmd(message: types.Message):
             )
         await message.reply('Все пользователи размучены')
 
-@dp.message(Command('девиз'))
+'''@dp.message(Command('девиз'))
 async def devis_cmd(message: types.Message):
     args = message.text.split()
     if len(args) == 2 and args[1].startswith('@'):
@@ -405,7 +397,7 @@ async def devis_cmd(message: types.Message):
         await message.reply(
             f'{a[9]}\n\n'
             f'Автор: {a[5]}'
-        )
+        )'''
 
 #интерактивные команды
 @dp.message()
