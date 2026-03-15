@@ -2,15 +2,25 @@ import asyncio
 import os
 import random
 import csv
+import json 
+from datetime import datetime, timedelta 
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
 from dotenv import load_dotenv, find_dotenv
-from datetime import timedelta
 
 load_dotenv(find_dotenv())
 
 import db
+
+ALLOWED_UPDATES = ['message']
+
+TIMER_FILE = 'files/timer.json'
+if not os.path.exists('files'):
+    os.makedirs('files')
+if not os.path.exists(TIMER_FILE):
+    with open(TIMER_FILE, 'w') as f:
+        json.dump([], f)
 
 bot = Bot(token=os.getenv("TOKEN"))
 dp = Dispatcher()
@@ -100,69 +110,143 @@ with open('комплименты.csv', 'r', encoding='UTF-8') as comp:
 
 orgcom = ['@diaa_le', '@aamdenisov', '@DmitriyIkhsanov', '@DmitriyIkhsanov', '@nikiforovau', '@Polyakovaaa', '@ulbnv']
 
+def read_timer():
+    with open(TIMER_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def write_timer(data):
+    with open(TIMER_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
 def find_user(message: types.Message):
     args = message.text.split()
-    if len(args) == 2 and args[1].startswith('@'):
+    if len(args) >= 2 and args[1].startswith('@'):
         return args[1][1:]
     return None
 
-@dp.message(Command("help"))
+async def check_alarms():
+    while True:
+        now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        alarms = read_timer()
+        if alarms:
+            new_alarms = []
+            triggered = False
+            for alarm in alarms:
+                if f"{alarm['date']} {alarm['time']}" == now:
+                    triggered = True
+                    try:
+                        await bot.send_message(alarm['chat_id'], f"🔔 @{alarm['user']}, ПОДЪЕМ!")
+                    except: pass
+                else:
+                    new_alarms.append(alarm)
+            if triggered:
+                write_timer(new_alarms)
+        await asyncio.sleep(30)
+
+@dp.message(Command("помощь", prefix="!"))
 async def help_cmd(message: types.Message):
     await message.answer(
     "📖 Доступные команды:\n"
     "\n"
     "Полезные:\n"
-    "/help — Список команд\n"
-    "/инфа [@username] — Информация о пользователе\n"
+    "!помощь — Список команд\n"
+    "!инфа [@username] — Информация о пользователе\n"
     #"/номер — Номер телефона пользователя\n"
-    "/мут [секунды] — Мутит пользователя (ответом на сообщение)\n"
-    "/анмут — Размут пользоватея. Используйте ответом на сообщение\n"
+    "!мут [секунды] — Мутит пользователя (ответом на сообщение)\n"
+    "!анмут — Размут пользоватея. Используйте ответом на сообщение\n"
     "\n"
     "Приколюха:\n"
-    "/вероятность — Рассчитывает вероятность события\n"
-    "/цитата — Сохраняет цитату (ответом на сообщение)\n"
-    "/мысль — Выводит рандомную цитату\n"
-    "/мысль [@username] — Цитата конкретного пользователя\n"
-    "/кто — Узнать, кто больше всего соответствует запросу\n"
-    "/совместимость — Показывает совместимость чего-либо\n"
-    "/комплимент — Сделать комплимент пользователю\n"
-    "/рулетка — Испытай удачу\n"
+    "!вероятность — Рассчитывает вероятность события\n"
+    "!цитата — Сохраняет цитату (ответом на сообщение)\n"
+    "!мысль — Выводит рандомную цитату\n"
+    "!мысль [@username] — Цитата конкретного пользователя\n"
+    "!кто — Узнать, кто больше всего соответствует запросу\n"
+    "!совместимость — Показывает совместимость чего-либо\n"
+    "!комплимент — Сделать комплимент пользователю\n"
+    "!рулетка — Испытай удачу\n"
+    "\n"
+    "Будильник:\n"
+    "!разбудить [сегодня/завтра/ДД:ММ] [ЧЧ:ММ] [@username] - без него разбудит тебя\n"
+    "!не будить — убрать меня из списка\n"
+    "!разбудяшки — список будильников\n"
     "\n"
     "Интерактивные команды:\n"
-    "/обнять [@username]\n"
-    "/пожать_руку [@username]\n"
-    "/погладить [@username]\n"
-    "/похвалить [@username]\n"
-    "/поддержать [@username]\n"
-    "/поблагодарить [@username]\n"
-    "/поздравить [@username]\n"
-    "/тыкнуть [@username]\n"
-    "/посмотреть [@username]\n"
-    "/позавидовать [@username]\n"
-    "/ударить [@username]\n"
-    "/уебать [@username]\n"
-    "/оскорбить [@username]\n"
-    "/уважать [@username]\n"
-    "/осуждать [@username]\n"
-    "/аплодировать [@username]"
+    "!обнять [@username]\n"
+    "!пожать_руку [@username]\n"
+    "!погладить [@username]\n"
+    "!похвалить [@username]\n"
+    "!поддержать [@username]\n"
+    "!поблагодарить [@username]\n"
+    "!поздравить [@username]\n"
+    "!тыкнуть [@username]\n"
+    "!посмотреть [@username]\n"
+    "!позавидовать [@username]\n"
+    "!ударить [@username]\n"
+    "!уебать [@username]\n"
+    "!оскорбить [@username]\n"
+    "!уважать [@username]\n"
+    "!осуждать [@username]\n"
+    "!аплодировать [@username]"
 )
 
+@dp.message(F.text.startswith("!разбудить"))
+async def set_alarm_cmd(message: types.Message):
+    args = message.text.split()
+    if len(args) < 3: return
+    
+    date_arg, time_arg = args[1].lower(), args[2]
+    target = args[3][1:] if len(args) > 3 and args[3].startswith('@') else message.from_user.username
+    
+    dt_now = datetime.now()
+    if date_arg == "сегодня": date_val = dt_now.strftime("%d.%m.%Y")
+    elif date_arg == "завтра": date_val = (dt_now + timedelta(days=1)).strftime("%d.%m.%Y")
+    else:
+        try:
+            date_val = datetime.strptime(date_arg, "%d.%m").replace(year=dt_now.year).strftime("%d.%m.%Y")
+        except: return await message.reply("Ошибка даты (ДД.ММ)")
 
+    alarms = read_timer()
+    alarms.append({"date": date_val, "time": time_arg, "user": target, "chat_id": message.chat.id})
+    write_timer(alarms)
+    await message.reply(f"Ок, разбужу @{target} {date_val} в {time_arg}")
 
-@dp.message(Command('вероятность'))
+@dp.message(F.text == "!не будить")
+async def unwake_cmd(message: types.Message):
+    alarms = read_timer()
+    new_alarms = [a for a in alarms if a['user'] != message.from_user.username]
+    if len(alarms) == len(new_alarms):
+        await message.answer("Хорошо...\nХотя тебя и не было в списке разбудяшек...")
+    else:
+        write_timer(new_alarms)
+        await message.answer("Хорошо, я не буду тебя будить!")
+
+@dp.message(F.text == "!разбудяшки")
+async def awakers_cmd(message: types.Message):
+    alarms = read_timer()
+    if not alarms: return await message.answer("Список пуст")
+    res = "Вот список разбудяшек:"
+    for a in alarms:
+        try:
+            u = db.userdata("@" + a['user'])[0]
+            name = f"{u[0]}" if u else a['user']
+        except: name = a['user']
+        res += f"\n{name} {a['date']} в {a['time']}"
+    await message.answer(res)
+
+@dp.message(Command('вероятность', prefix="!"))
 async def chance_cmd(message: types.Message):
-    event = message.text.replace('/вероятность', '', 1).strip()
+    event = message.text.replace('!вероятность', '', 1).strip()
     chance = random.randint(0, 100)
     if not event:
         await message.reply('Напишите событие')
     else:
-        await message.reply(f'Вероятность того, что {event} - {chance}%')
+        await message.reply(f'Вероятность {event} - {chance}%')
 
-@dp.message(Command('тест'))
+@dp.message(Command('тест', prefix="!"))
 async def test_cmd(message: types.Message):
     await message.answer(message.text)
 
-@dp.message(Command('инфа'))
+@dp.message(Command('инфа', prefix="!"))
 async def info_cmd(message: types.Message):
     args = message.text.split()
     if len(args) > 1 and args[1].startswith('@'):
@@ -200,7 +284,7 @@ async def info_cmd(message: types.Message):
 
     await message.reply(text, parse_mode="HTML")
 
-'''@dp.message(Command('номер'))
+'''@dp.message(Command('номер', prefix="!"))
 async def number_cmd(message: types.Message):
     user = None
     if message.reply_to_message:
@@ -224,7 +308,7 @@ async def number_cmd(message: types.Message):
     user_number = userinfo[7]
     await message.reply(user_number)'''
 
-@dp.message(Command('мысль'))
+@dp.message(Command('мысль', prefix="!"))
 async def thought_cmd(message: types.Message):
     thoughts = []
     with open('цитаты.csv', 'r', encoding='UTF-8') as file:
@@ -259,7 +343,7 @@ async def thought_cmd(message: types.Message):
 
 
 
-@dp.message(Command('цитата'))
+@dp.message(Command('цитата', prefix="!"))
 async def quote_cmd(message: types.Message):
     quote = message.reply_to_message.text
     user = message.reply_to_message.from_user.username
@@ -275,20 +359,20 @@ async def quote_cmd(message: types.Message):
             f"— @{user}"
         )
 
-@dp.message(Command('кто'))
+@dp.message(Command('кто', prefix="!"))
 async def who_cmd(message: types.Message):
     question = message.text.split()
     who = random.choice(db.usernames())[0]
     if len(question) < 2:
         await message.reply('Вы неправильно использовали команду\nПопробуйте снова')
     else:
-        question.remove('/кто')
+        question.remove('!кто')
         a = ' '.join(question)
         await message.reply(
             f'{who} {a}'
         )
 
-@dp.message(Command('комплимент'))
+@dp.message(Command('комплимент', prefix="!"))
 async def complement_cmd(message: types.Message):
     user = None
     if message.reply_to_message:
@@ -307,7 +391,7 @@ async def complement_cmd(message: types.Message):
         complement = random.choice(complements)
         await message.reply(f'@{user} {complement}')    
 
-@dp.message(Command('совместимость'))
+@dp.message(Command('совместимость', prefix="!"))
 async def compatibility_cmd(message: types.Message):
     event = message.text.replace('/совместимость', '', 1).strip()
     compatibility = random.randint(0, 100)
@@ -316,7 +400,7 @@ async def compatibility_cmd(message: types.Message):
     else:
         await message.reply(f'Совместимость {event} - {compatibility}%')
 
-@dp.message(Command('рулетка'))
+@dp.message(Command('рулетка', prefix="!"))
 async def roulette_cmd(message: types.Message):
     a = message.from_user
     Users[a.id] = a.username
@@ -333,7 +417,7 @@ async def roulette_cmd(message: types.Message):
     else:
         await message.reply('Везунчик, живешь без мута\nПопробуй еще раз')
 
-@dp.message(Command('мут'))
+@dp.message(Command('мут', prefix="!"))
 async def mute_cmd(message: types.Message):
     args = message.text.split()
     member = await bot.get_chat_member(
@@ -362,7 +446,7 @@ async def mute_cmd(message: types.Message):
             await message.reply('Введите в формате\n/мут [секунды]\nи используйте ответом на сообщение пользователя')   
     else:
         await message.reply('Нельзя тебе мутить\nМаленький еще!')
-@dp.message(Command('анмут'))
+@dp.message(Command('анмут', prefix="!"))
 async def unmute_cmd(message: types.Message):
     if message.reply_to_message:
         await bot.restrict_chat_member(
@@ -380,7 +464,7 @@ async def unmute_cmd(message: types.Message):
             )
         await message.reply('Все пользователи размучены')
 
-'''@dp.message(Command('девиз'))
+'''@dp.message(Command('девиз', prefix="!"))
 async def devis_cmd(message: types.Message):
     args = message.text.split()
     if len(args) == 2 and args[1].startswith('@'):
@@ -402,7 +486,7 @@ async def devis_cmd(message: types.Message):
 #интерактивные команды
 @dp.message()
 async def action_cmd(message: types.Message):
-    if not message.text.startswith('/'):
+    if not message.text or not message.text.startswith('!'):
         return
     command = message.text.split()
     command = command[0][1:]
@@ -424,7 +508,8 @@ async def save_users(message: types.Message):
 async def main():
     print('Бот работает')
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    asyncio.create_task(check_alarms()) # Запуск фоновой проверки будильников
+    await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
 
 if __name__ == "__main__":
     asyncio.run(main())
