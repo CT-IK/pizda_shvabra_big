@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
 from dotenv import load_dotenv, find_dotenv
+from zoneinfo import ZoneInfo 
 
 load_dotenv(find_dotenv())
 
@@ -101,8 +102,7 @@ ACTIONS = {
 }
 
 
-def now_msk():
-    return datetime.utcnow() + timedelta(hours=3)
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
 Users = {}
 complements = []
@@ -128,20 +128,21 @@ def find_user(message: types.Message):
 
 async def check_alarms():
     while True:
-        now = now_msk()
+        now = datetime.now(MOSCOW_TZ).strftime("%d.%m.%Y %H:%M")  # Москва
         alarms = read_timer()
         if alarms:
             new_alarms = []
+            triggered = False
             for alarm in alarms:
-                alarm_time = datetime.strptime(f"{alarm['date']} {alarm['time']}", "%d.%m.%Y %H:%M")
-                if now >= alarm_time:
+                if f"{alarm['date']} {alarm['time']}" == now:
+                    triggered = True
                     try:
                         await bot.send_message(alarm['chat_id'], f"🔔 @{alarm['user']}, ПОДЪЕМ!")
-                    except:
-                        pass
+                    except: pass
                 else:
                     new_alarms.append(alarm)
-            write_timer(new_alarms)
+            if triggered:
+                write_timer(new_alarms)
         await asyncio.sleep(30)
 
 @dp.message(Command("помощь", prefix="!"))
@@ -199,7 +200,7 @@ async def set_alarm_cmd(message: types.Message):
     date_arg, time_arg = args[1].lower(), args[2]
     target = args[3][1:] if len(args) > 3 and args[3].startswith('@') else message.from_user.username
 
-    dt_now = now_msk()
+    dt_now = datetime.now(MOSCOW_TZ)
 
     # Формируем дату будильника
     if date_arg == "сегодня":
