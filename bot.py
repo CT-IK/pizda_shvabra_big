@@ -101,6 +101,8 @@ ACTIONS = {
 }
 
 
+def now_msk():
+    return datetime.utcnow() + timedelta(hours=3)
 
 Users = {}
 complements = []
@@ -126,21 +128,20 @@ def find_user(message: types.Message):
 
 async def check_alarms():
     while True:
-        now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        now = now_msk()
         alarms = read_timer()
         if alarms:
             new_alarms = []
-            triggered = False
             for alarm in alarms:
-                if f"{alarm['date']} {alarm['time']}" == now:
-                    triggered = True
+                alarm_time = datetime.strptime(f"{alarm['date']} {alarm['time']}", "%d.%m.%Y %H:%M")
+                if now >= alarm_time:
                     try:
                         await bot.send_message(alarm['chat_id'], f"🔔 @{alarm['user']}, ПОДЪЕМ!")
-                    except: pass
+                    except:
+                        pass
                 else:
                     new_alarms.append(alarm)
-            if triggered:
-                write_timer(new_alarms)
+            write_timer(new_alarms)
         await asyncio.sleep(30)
 
 @dp.message(Command("помощь", prefix="!"))
@@ -192,23 +193,37 @@ async def help_cmd(message: types.Message):
 @dp.message(F.text.startswith("!разбудить"))
 async def set_alarm_cmd(message: types.Message):
     args = message.text.split()
-    if len(args) < 3: return
-    
+    if len(args) < 3:
+        return await message.reply("Используй: !разбудить [сегодня/завтра/ДД.ММ] [ЧЧ:ММ] [@username]")
+
     date_arg, time_arg = args[1].lower(), args[2]
     target = args[3][1:] if len(args) > 3 and args[3].startswith('@') else message.from_user.username
-    
-    dt_now = datetime.now()
-    if date_arg == "сегодня": date_val = dt_now.strftime("%d.%m.%Y")
-    elif date_arg == "завтра": date_val = (dt_now + timedelta(days=1)).strftime("%d.%m.%Y")
+
+    dt_now = now_msk()
+
+    # Формируем дату будильника
+    if date_arg == "сегодня":
+        date_val = dt_now.strftime("%d.%m.%Y")
+    elif date_arg == "завтра":
+        date_val = (dt_now + timedelta(days=1)).strftime("%d.%m.%Y")
     else:
         try:
             date_val = datetime.strptime(date_arg, "%d.%m").replace(year=dt_now.year).strftime("%d.%m.%Y")
-        except: return await message.reply("Ошибка даты (ДД.ММ)")
+        except:
+            return await message.reply("Ошибка даты (ДД.ММ)")
 
+    # Проверка корректности времени
+    try:
+        datetime.strptime(f"{date_val} {time_arg}", "%d.%m.%Y %H:%M")
+    except:
+        return await message.reply("Ошибка времени (ЧЧ:ММ)")
+
+    # Сохраняем будильник
     alarms = read_timer()
     alarms.append({"date": date_val, "time": time_arg, "user": target, "chat_id": message.chat.id})
     write_timer(alarms)
     await message.reply(f"Ок, разбужу @{target} {date_val} в {time_arg}")
+
 
 @dp.message(F.text == "!не будить")
 async def unwake_cmd(message: types.Message):
